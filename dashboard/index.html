@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股与全球金融风险监测仪表盘</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --orange: #e06c00;
+    --red: #f85149;
+    --black-risk: #9e44e8;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  .header { padding: 20px 24px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: var(--accent); letter-spacing: 0.3px; }
+  .header-meta { font-size: 12px; color: var(--text-muted); }
+  .last-update { font-size: 11px; color: var(--text-muted); }
+
+  .main { padding: 20px 24px; display: grid; gap: 18px; }
+
+  /* ── Composite Gauge ── */
+  .composite-section { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 700px) { .composite-section { grid-template-columns: 1fr; } }
+
+  .gauge-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; }
+  .gauge-label { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .gauge-wrap { position: relative; width: 160px; height: 90px; margin: 0 auto 10px; overflow: hidden; }
+  .gauge-arc-bg { position: absolute; inset: 0; }
+  .gauge-needle-wrap { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 80px; transform-origin: bottom center; transition: transform 0.8s cubic-bezier(.4,0,.2,1); }
+  .gauge-needle { width: 4px; height: 80px; background: linear-gradient(to top, #fff, transparent); border-radius: 2px; }
+  .gauge-dot { position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); width: 10px; height: 10px; background: #fff; border-radius: 50%; }
+  .gauge-score { font-size: 42px; font-weight: 700; line-height: 1; }
+  .gauge-alert-badge { display: inline-block; margin-top: 6px; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .gauge-desc { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  .signals-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .signals-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+  .signal-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 9px; font-size: 13px; line-height: 1.5; }
+  .signal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); margin-top: 6px; flex-shrink: 0; }
+  .top-risk-box { margin-top: 14px; padding: 10px 12px; background: rgba(240,100,40,0.1); border-left: 3px solid var(--orange); border-radius: 4px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .top-risk-box strong { color: var(--orange); }
+
+  /* ── 6 Dimension Cards ── */
+  .dim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 800px) { .dim-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .dim-grid { grid-template-columns: 1fr; } }
+
+  .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .dim-name { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .dim-score-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .dim-score { font-size: 32px; font-weight: 700; }
+  .dim-score-100 { font-size: 13px; color: var(--text-muted); }
+  .dim-bar-bg { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .dim-bar { height: 6px; border-radius: 3px; transition: width 0.6s ease; }
+  .dim-desc { font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+  .dim-delta { font-size: 11px; margin-top: 4px; }
+  .delta-up { color: var(--red); }
+  .delta-dn { color: var(--green); }
+  .delta-flat { color: var(--text-muted); }
+
+  /* ── Trend Chart ── */
+  .trend-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .trend-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .trend-title { font-size: 13px; font-weight: 600; }
+  .trend-tabs { display: flex; gap: 6px; }
+  .tab-btn { padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 11px; cursor: pointer; transition: all 0.2s; }
+  .tab-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  .chart-container { position: relative; height: 200px; }
+
+  /* ── Alert Legend ── */
+  .legend-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 16px; background: var(--surface2); border-radius: 8px; font-size: 11px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── color utils ── */
+  .c-green { color: var(--green); } .c-yellow { color: var(--yellow); }
+  .c-orange { color: var(--orange); } .c-red { color: var(--red); } .c-purple { color: var(--black-risk); }
+  .bg-green { background: var(--green); } .bg-yellow { background: var(--yellow); }
+  .bg-orange { background: var(--orange); } .bg-red { background: var(--red); } .bg-purple { background: var(--black-risk); }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge-yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .badge-orange { background: rgba(224,108,0,.15); color: var(--orange); }
+  .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
+  .badge-purple { background: rgba(158,68,232,.15); color: var(--black-risk); }
+
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 10px; }
+  .divider { border: none; border-top: 1px solid var(--border); }
+  .footer { padding: 14px 24px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 美股与全球金融风险监测仪表盘</h1>
+    <div class="header-meta">数据来源：美联储 · IMF · BIS · 穆迪 · 标普 · 路透社 · 彭博 · 华尔街日报</div>
+  </div>
+  <div class="last-update" id="lastUpdate">加载中…</div>
+</div>
+
+<div class="main">
+
+  <!-- Legend -->
+  <div class="legend-row">
+    <div class="legend-item"><div class="legend-dot bg-green"></div><span>0–39 低风险</span></div>
+    <div class="legend-item"><div class="legend-dot bg-yellow"></div><span>40–59 中等风险</span></div>
+    <div class="legend-item"><div class="legend-dot bg-orange"></div><span>60–74 高风险</span></div>
+    <div class="legend-item"><div class="legend-dot bg-red"></div><span>75–89 极高风险</span></div>
+    <div class="legend-item"><div class="legend-dot bg-purple"></div><span>90–100 系统性危机</span></div>
+    <span style="color:var(--text-muted);font-size:10px;margin-left:auto">综合权重：货币政策25% + 资产估值20% + 信用债务20% + 流动性20% + 系统风险10% + 地缘5%</span>
+  </div>
+
+  <!-- Composite Gauge + Signals -->
+  <div class="composite-section">
+    <div class="gauge-card">
+      <div class="gauge-label">综合风险指数</div>
+      <div class="gauge-wrap">
+        <canvas id="gaugeCanvas" width="160" height="90"></canvas>
+        <div class="gauge-needle-wrap" id="gaugeNeedle">
+          <div class="gauge-needle"></div>
+          <div class="gauge-dot"></div>
+        </div>
+      </div>
+      <div class="gauge-score" id="compositeScore">—</div>
+      <div><span class="gauge-alert-badge" id="alertBadge">—</span></div>
+      <div class="gauge-desc" id="alertDesc">—</div>
+    </div>
+
+    <div class="signals-card">
+      <div class="signals-title">今日关键风险信号</div>
+      <div id="signalsList"></div>
+      <div class="top-risk-box" id="topRisk"></div>
+    </div>
+  </div>
+
+  <!-- 6 Dimensions -->
+  <div>
+    <div class="section-label">六大风险维度</div>
+    <div class="dim-grid" id="dimGrid"></div>
+  </div>
+
+  <!-- Trend Chart -->
+  <div class="trend-card">
+    <div class="trend-header">
+      <div class="trend-title">历史趋势 — 综合风险指数</div>
+      <div class="trend-tabs">
+        <button class="tab-btn active" onclick="switchChart('composite',this)">综合</button>
+        <button class="tab-btn" onclick="switchChart('fed_policy',this)">货币政策</button>
+        <button class="tab-btn" onclick="switchChart('asset_valuation',this)">估值</button>
+        <button class="tab-btn" onclick="switchChart('credit_debt',this)">信用/债务</button>
+        <button class="tab-btn" onclick="switchChart('liquidity',this)">流动性</button>
+        <button class="tab-btn" onclick="switchChart('all',this)">全维度</button>
+      </div>
+    </div>
+    <div class="chart-container"><canvas id="trendChart"></canvas></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  ⚠️ 本仪表盘为辅助决策工具，数据来自公开权威机构。风险评分为综合分析判断，不构成投资建议。每日北京时间22:37自动更新。
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// DATA — injected by update script each day
+// ═══════════════════════════════════════════════
+const RISK_DATA = {"meta":{"description":"US Financial Risk Dashboard - Daily Risk Scores","dimensions":{"fed_policy":"美联储政策风险 (0=宽松/降息, 100=极度收紧/加息)","asset_valuation":"资产估值泡沫风险 (0=低估, 100=严重泡沫)","credit_debt":"信用/主权债务风险 (0=健康, 100=危机)","liquidity":"市场流动性风险 (0=充裕, 100=枯竭)","systemic":"系统性金融风险 (0=稳定, 100=崩溃)","geopolitical":"地缘政治金融冲击 (0=无威胁, 100=极端冲击)"},"composite_formula":"weighted average: fed_policy*0.25 + asset_valuation*0.20 + credit_debt*0.20 + liquidity*0.20 + systemic*0.10 + geopolitical*0.05","alert_levels":{"green":"0-39: 低风险 — 正常市场环境","yellow":"40-59: 中等风险 — 需要关注","orange":"60-74: 高风险 — 建议防御","red":"75-89: 极高风险 — 危机前兆","black":"90-100: 系统性危机"}},"history":[{"date":"2026-06-30","scores":{"fed_policy":72,"asset_valuation":68,"credit_debt":61,"liquidity":58,"systemic":52,"geopolitical":55},"composite":64,"alert":"orange","key_signals":["美联储6月点阵图转向加息1-2次，政策预期骤然逆转","核心PCE升至3.3%，通胀黏性强于预期","外国买家持续减持美债，10Y收益率4.37%、30Y达4.87%","纳斯达克单日跌4.2%，S&P500蒸发1.8万亿美元(6月5日)","三大评级机构均已下调美国主权评级，穆迪Aa1"],"sources":["Federal Reserve Financial Stability Report (2026-05-08)","IMF Global Financial Stability Report (2026-04-14)","CNBC Treasury Yield Report (2026-05-20)","Moody's US Downgrade (2025-05-16)"],"top_risk":"美联储政策转向加息叠加通胀黏性，长端利率上行压力直接压制高估值股市"}]};
+
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const DIM_CONFIG = [
+  { key: 'fed_policy',       label: '货币政策风险',   weight: 0.25, desc: '美联储利率路径与政策转向风险' },
+  { key: 'asset_valuation',  label: '资产估值泡沫',   weight: 0.20, desc: '股市、债市、私人信贷估值偏离基本面程度' },
+  { key: 'credit_debt',      label: '信用/主权债务',  weight: 0.20, desc: '主权评级、企业信用利差、债务可持续性' },
+  { key: 'liquidity',        label: '市场流动性',     weight: 0.20, desc: '国债市场流动性、美元离岸流动性、外国买盘' },
+  { key: 'systemic',         label: '系统性金融风险', weight: 0.10, desc: '银行体系、影子银行、NBFI互联性风险' },
+  { key: 'geopolitical',     label: '地缘政治冲击',   weight: 0.05, desc: '中东战事、贸易摩擦、汇率地缘博弈' },
+];
+
+const ALERT_MAP = {
+  green:  { label: '低风险',     cls: 'c-green',  badge: 'badge-green',  desc: '市场环境正常，无需特别防御' },
+  yellow: { label: '中等风险',   cls: 'c-yellow', badge: 'badge-yellow', desc: '风险信号出现，建议适度关注' },
+  orange: { label: '高风险',     cls: 'c-orange', badge: 'badge-orange', desc: '多项风险叠加，建议防御性配置' },
+  red:    { label: '极高风险',   cls: 'c-red',    badge: 'badge-red',    desc: '危机前兆，建议大幅降低风险敞口' },
+  black:  { label: '系统性危机', cls: 'c-purple', badge: 'badge-purple', desc: '系统性危机临界，极端防御' },
+};
+
+function scoreToAlert(s) {
+  if (s < 40) return 'green';
+  if (s < 60) return 'yellow';
+  if (s < 75) return 'orange';
+  if (s < 90) return 'red';
+  return 'black';
+}
+
+function scoreColor(s) {
+  if (s < 40) return '#3fb950';
+  if (s < 60) return '#d29922';
+  if (s < 75) return '#e06c00';
+  if (s < 90) return '#f85149';
+  return '#9e44e8';
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+const history = RISK_DATA.history;
+const today   = history[history.length - 1];
+const prev    = history.length > 1 ? history[history.length - 2] : null;
+
+// Last update
+document.getElementById('lastUpdate').textContent =
+  '最后更新：' + today.date + ' 22:37 BJT';
+
+// Composite gauge
+const composite = today.composite;
+const alertKey  = today.alert || scoreToAlert(composite);
+const alertInfo = ALERT_MAP[alertKey];
+
+document.getElementById('compositeScore').textContent  = composite;
+document.getElementById('compositeScore').className    = 'gauge-score ' + alertInfo.cls;
+const badge = document.getElementById('alertBadge');
+badge.textContent = alertInfo.label;
+badge.className   = 'gauge-alert-badge ' + alertInfo.badge;
+document.getElementById('alertDesc').textContent = alertInfo.desc;
+
+// Draw half-pie gauge
+(function drawGauge() {
+  const canvas = document.getElementById('gaugeCanvas');
+  const ctx    = canvas.getContext('2d');
+  const cx = 80, cy = 88, r = 70;
+  const segments = [
+    { from: Math.PI, to: Math.PI * 1.26, color: '#3fb950' },
+    { from: Math.PI * 1.26, to: Math.PI * 1.52, color: '#d29922' },
+    { from: Math.PI * 1.52, to: Math.PI * 1.74, color: '#e06c00' },
+    { from: Math.PI * 1.74, to: Math.PI * 1.90, color: '#f85149' },
+    { from: Math.PI * 1.90, to: Math.PI * 2, color: '#9e44e8' },
+  ];
+  ctx.clearRect(0, 0, 160, 90);
+  segments.forEach(seg => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, seg.from, seg.to);
+    ctx.closePath();
+    ctx.fillStyle = seg.color + '33';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, seg.from, seg.to);
+    ctx.strokeStyle = seg.color;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 12, Math.PI, Math.PI * 2);
+  ctx.fillStyle = '#0d1117';
+  ctx.fill();
+
+  // needle
+  const angle = Math.PI + (composite / 100) * Math.PI;
+  const needle = document.getElementById('gaugeNeedle');
+  const deg    = (angle * 180 / Math.PI) - 90;
+  needle.style.transform = `translateX(-50%) rotate(${deg}deg)`;
+})();
+
+// Key signals
+const signalsList = document.getElementById('signalsList');
+today.key_signals.forEach(sig => {
+  signalsList.innerHTML +=
+    `<div class="signal-item"><div class="signal-dot"></div><span>${sig}</span></div>`;
+});
+document.getElementById('topRisk').innerHTML =
+  `<strong>核心判断：</strong>${today.top_risk}`;
+
+// 6 Dimension cards
+const dimGrid = document.getElementById('dimGrid');
+DIM_CONFIG.forEach(d => {
+  const score = today.scores[d.key];
+  const color = scoreColor(score);
+  let deltaHtml = '';
+  if (prev) {
+    const diff = score - prev.scores[d.key];
+    if (diff > 0) deltaHtml = `<div class="dim-delta delta-up">▲ ${diff} 较昨日</div>`;
+    else if (diff < 0) deltaHtml = `<div class="dim-delta delta-dn">▼ ${Math.abs(diff)} 较昨日</div>`;
+    else deltaHtml = `<div class="dim-delta delta-flat">— 持平</div>`;
+  }
+  dimGrid.innerHTML += `
+    <div class="dim-card">
+      <div class="dim-name">${d.label} <span style="color:var(--text-muted);font-size:10px">权重${(d.weight*100)|0}%</span></div>
+      <div class="dim-score-row">
+        <span class="dim-score" style="color:${color}">${score}</span>
+        <span class="dim-score-100">/100</span>
+      </div>
+      <div class="dim-bar-bg"><div class="dim-bar" style="width:${score}%;background:${color}"></div></div>
+      ${deltaHtml}
+      <div class="dim-desc">${d.desc}</div>
+    </div>`;
+});
+
+// ═══════════════════════════════════════════════
+// TREND CHART
+// ═══════════════════════════════════════════════
+const TREND_COLORS = {
+  composite:      '#58a6ff',
+  fed_policy:     '#f85149',
+  asset_valuation:'#e06c00',
+  credit_debt:    '#d29922',
+  liquidity:      '#3fb950',
+  systemic:       '#9e44e8',
+  geopolitical:   '#8b949e',
+};
+
+const DIM_LABELS = {
+  composite:      '综合风险',
+  fed_policy:     '货币政策',
+  asset_valuation:'资产估值',
+  credit_debt:    '信用/债务',
+  liquidity:      '流动性',
+  systemic:       '系统风险',
+  geopolitical:   '地缘政治',
+};
+
+const dates = history.map(h => h.date.slice(5));
+
+let trendChart;
+
+function buildDatasets(mode) {
+  if (mode === 'all') {
+    return DIM_CONFIG.map(d => ({
+      label: DIM_LABELS[d.key],
+      data: history.map(h => h.scores[d.key]),
+      borderColor: TREND_COLORS[d.key],
+      backgroundColor: TREND_COLORS[d.key] + '22',
+      borderWidth: 1.5,
+      tension: 0.4,
+      pointRadius: history.length <= 7 ? 4 : 2,
+      fill: false,
+    }));
+  }
+  const key = mode;
+  const vals = key === 'composite'
+    ? history.map(h => h.composite)
+    : history.map(h => h.scores[key]);
+  return [{
+    label: DIM_LABELS[key],
+    data: vals,
+    borderColor: TREND_COLORS[key],
+    backgroundColor: TREND_COLORS[key] + '22',
+    borderWidth: 2,
+    tension: 0.4,
+    pointRadius: history.length <= 14 ? 4 : 2,
+    fill: true,
+  }];
+}
+
+function initChart(mode) {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets: buildDatasets(mode) },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 10 } },
+        tooltip: {
+          backgroundColor: '#1c2330',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#e6edf3',
+          bodyColor: '#8b949e',
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}`,
+          }
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: {
+          min: 0, max: 100,
+          ticks: { color: '#8b949e', font: { size: 10 }, stepSize: 20 },
+          grid: { color: '#21262d' },
+        }
+      }
+    }
+  });
+
+  // Alert zone bands
+  const zones = [
+    { y: 0,  h: 40, color: 'rgba(63,185,80,0.04)' },
+    { y: 40, h: 20, color: 'rgba(210,153,34,0.06)' },
+    { y: 60, h: 15, color: 'rgba(224,108,0,0.08)' },
+    { y: 75, h: 15, color: 'rgba(248,81,73,0.08)' },
+    { y: 90, h: 10, color: 'rgba(158,68,232,0.10)' },
+  ];
+  // drawn via annotation would need plugin; skip for simplicity
+}
+
+function switchChart(mode, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  initChart(mode);
+}
+
+initChart('composite');
+</script>
+</body>
+</html>

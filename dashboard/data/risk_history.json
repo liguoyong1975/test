@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "description": "US Financial Risk Dashboard - Daily Risk Scores",
+    "dimensions": {
+      "fed_policy": "美联储政策风险 (0=宽松/降息, 100=极度收紧/加息)",
+      "asset_valuation": "资产估值泡沫风险 (0=低估, 100=严重泡沫)",
+      "credit_debt": "信用/主权债务风险 (0=健康, 100=危机)",
+      "liquidity": "市场流动性风险 (0=充裕, 100=枯竭)",
+      "systemic": "系统性金融风险 (0=稳定, 100=崩溃)",
+      "geopolitical": "地缘政治金融冲击 (0=无威胁, 100=极端冲击)"
+    },
+    "composite_formula": "weighted average: fed_policy*0.25 + asset_valuation*0.20 + credit_debt*0.20 + liquidity*0.20 + systemic*0.10 + geopolitical*0.05",
+    "alert_levels": {
+      "green": "0-39: 低风险 — 正常市场环境",
+      "yellow": "40-59: 中等风险 — 需要关注",
+      "orange": "60-74: 高风险 — 建议防御",
+      "red": "75-89: 极高风险 — 危机前兆",
+      "black": "90-100: 系统性危机"
+    }
+  },
+  "history": [
+    {
+      "date": "2026-06-30",
+      "scores": {
+        "fed_policy": 72,
+        "asset_valuation": 68,
+        "credit_debt": 61,
+        "liquidity": 58,
+        "systemic": 52,
+        "geopolitical": 55
+      },
+      "composite": 64,
+      "alert": "orange",
+      "key_signals": [
+        "美联储6月点阵图转向加息1-2次，政策预期骤然逆转",
+        "核心PCE升至3.3%，通胀黏性强于预期",
+        "外国买家持续减持美债，10Y收益率4.37%、30Y达4.87%",
+        "纳斯达克单日跌4.2%，S&P500蒸发1.8万亿美元(6月5日)",
+        "三大评级机构均已下调美国主权评级，穆迪Aa1"
+      ],
+      "sources": [
+        "Federal Reserve Financial Stability Report (2026-05-08)",
+        "IMF Global Financial Stability Report (2026-04-14)",
+        "CNBC Treasury Yield Report (2026-05-20)",
+        "Moody's US Downgrade (2025-05-16)"
+      ],
+      "top_risk": "美联储政策转向加息叠加通胀黏性，长端利率上行压力直接压制高估值股市"
+    }
+  ]
+}
